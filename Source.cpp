@@ -14,6 +14,9 @@ vector<thread> threads1;
 vector<thread> threads2;
 vector<thread> threads3;
 
+
+int first1, first2, last1, last2;
+
 void printResult(vector<vector<int>>& matrix) {
 	cout << "Matrix C: " << endl;
 	for (int i = 0; i < n; ++i) {
@@ -25,14 +28,28 @@ void printResult(vector<vector<int>>& matrix) {
 
 }
 
-void algotithm1(vector<vector<int>> &result1, int count) {
-	int firstRow = n / numberOfThreads * count;
-	int lastRow = n / numberOfThreads * (count + 1);
-	if ((n - 1) < lastRow) {
-		lastRow = n - 1;
+void algotithm1(vector<vector<int>> &result1, int i, int j) {
+	first1 = (n / numberOfThreads) <= 1 ? 1:(n/numberOfThreads);
+	last1 = (p / numberOfThreads) <= 1? 1: (p/ numberOfThreads);
+	int n1, n2, p1, p2;
+	if (i >= numberOfThreads - 1 || i >= n - 1) {
+		n1 = i * first1;
+		n2 = n;
 	}
-	for (int i = firstRow; i <= lastRow; ++i) {
-		for (int j = 0; j < p; ++j) {
+	else {
+		n1 = i * first1;
+		n2 = (i + 1) * first1;
+	}
+	if (j >= numberOfThreads - 1 || j >= p - 1) {
+		p1 = j * last1;
+		p2 = p;
+	}
+	else {
+		p1 = j * last1;
+		p2 = (j + 1) * last1;
+	}
+	for (int i = n1; i < n2; ++i) {
+		for (int j = p1; j < p2; ++j) {
 			for (int h = 0; h < m; ++h)
 				result1[i][j] += matrixA[i][h] * matrixB[h][j];
 		}
@@ -40,37 +57,62 @@ void algotithm1(vector<vector<int>> &result1, int count) {
 }
 
 void algorithm2(vector<vector<int>>& result2, int count) {
-	int firstCol = m / numberOfThreads * count;
-	int lastCol = m / numberOfThreads * (count + 1);
-	if (m - 1 < lastCol) {
-		lastCol = m - 1;
+	first1 = (m / numberOfThreads) <= 1 ? 1: (m/numberOfThreads);
+	int m1, m2;
+	if (count >= numberOfThreads - 1 || count >= m - 1) {
+		m1 = count * first1;
+		m2 = m;
+	}
+	else {
+		m1 = count * first1;
+		m2 = (count + 1) * first1;
 	}
 	for (int i = 0; i < n; ++i) {
 		for (int j = 0; j < p; ++j) {
-			for (int k = firstCol; k <= lastCol; ++k)
+			for (int k = m1; k < m2; ++k)
 				result2[i][j] += matrixA[i][k] * matrixB[k][j];
 		}
 	}
 }
 
-void algorithm3(vector<vector<int>>& result3,int count) {
-	int first1 = n / numberOfThreads * count;
-	int last1 = n / numberOfThreads * (count + 1);
-	int first2 = m / numberOfThreads * count;
-	int last2 = m / numberOfThreads * (count + 1);
-	if ((n - 1) < last1) {
-		last1 = n - 1;
+void algorithm3(vector<vector<int>>& result3,int i, int h, int j) {
+	int n1, n2, m1, m2, p1, p2;
+	first1 = (n / numberOfThreads) <= 1 ? 1 : (n / numberOfThreads);
+	last1 = (m / numberOfThreads) <= 1 ? 1 : (m / numberOfThreads);
+	last2 = (p / numberOfThreads) <= 1 ? 1 : (p / numberOfThreads);
+
+	if (i >= numberOfThreads - 1 || i >= n - 1) {
+		n1 = i * first1;
+		n2 = n;
 	}
-	if ((m - 1) < last2) {
-		last2 = m - 1;
+	else {
+		n1 = i * first1;
+		n2 = (i + 1) * first1;
 	}
-	for (int i = first1; i <= last1; ++i) {
-		for (int j = 0; j < p; ++j) {
-			for (int h = first2; h <= last2; ++h)
-				result3[i][j] += matrixA[i][h] * matrixB[h][j];
+	if (h >= numberOfThreads - 1 || h >= m - 1) {
+		m1 = h * last1;
+		m2 = m;
+	}
+	else {
+		m1 = h * last1;
+		m2 = (h + 1) * last1;
+	}
+	if (j >= numberOfThreads - 1 || j >= p - 1) {
+		p1 = j * last2;
+		p2 = p;
+	}
+	else {
+		p1 = j * last2;
+		p2 = (j + 1) * last2;
+	}
+	for (int i = n1; i < n2; ++i) {
+		for (int j = p1; j < p2; ++j) {
+			for (int d = m1; d <m2; ++d)
+				result3[i][j] += matrixA[i][d] * matrixB[d][j];
 		}
 	}
 }
+
 
 int main() {
 	ifstream fin("input.txt");
@@ -121,23 +163,28 @@ int main() {
 		}
 	}
 	duration = (clock() - (double)timeBegin) / (double)CLOCKS_PER_SEC;
-	printResult(matrixC);
 	cout << "Time:" << duration << endl;
+	printResult(matrixC);
 	cout << endl;
 
 	cout << "The first algorithm: " << endl;
 	unsigned int timeBegin1 = clock();
 	for (int i = 0; i < numberOfThreads; ++i) {
-		threads1.push_back(thread(algotithm1, ref(result1), i));
+		for (int j = 0; j < numberOfThreads; ++j) {
+			threads1.push_back(thread(algotithm1, ref(result1), i, j));
+		}
 	}
 	for (auto& t : threads1) {
 		t.join();
 	}
 	duration = (clock() - (double)timeBegin1) / (double)CLOCKS_PER_SEC;
 	cout << "Time:" << duration << endl;
+	printResult(result1);
 	cout << endl;
+	
 
 	cout << "The second algorithm: " << endl;
+
 	unsigned int timeBegin2 = clock();
 	for (int i = 0; i < numberOfThreads; ++i) {
 		threads2.push_back(thread(algorithm2, ref(result2), i));
@@ -147,19 +194,26 @@ int main() {
 	}
 	duration = (clock() - (double)timeBegin2) / (double)CLOCKS_PER_SEC;
 	cout << "Time:" << duration << endl;
+	printResult(result2);
 	cout << endl;
 	
+	
 	cout << "The third algorithm: " << endl;
+
 	unsigned int timeBegin3 = clock();
 	for (int i = 0; i < numberOfThreads; ++i) {
-		threads3.push_back(thread(algorithm3, ref(result3), i));
+		for (int h = 0; h < numberOfThreads; ++h) {
+			for (int j = 0; j < numberOfThreads; ++j) {
+				threads3.push_back(thread(algorithm3, ref(result3), i, h, j));
+			}
+		}
 	}
 	for (auto& t : threads3) {
 		t.join();
 	}
 	duration = (clock() - (double)timeBegin3) / (double)CLOCKS_PER_SEC;
 	cout << "Time:" << duration << endl;
-
+	printResult(result3);
 	cout << endl;
 	
 	return 0;
