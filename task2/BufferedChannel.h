@@ -12,66 +12,68 @@
 template<class T>
 class BufferedChannel {
 public:
-	explicit BufferedChannel(int size) : buffer_size_(size) {
-		is_closed_ = false;
+	explicit BufferedChannel(int size) {
+		bufferSize = size;
+		isClosed = false;
 	}
 
 	void Send(T value) {
-		if (is_closed_) {
-			std::runtime_error("closed");
-			return;
+		if (isClosed) {
+			throw std::runtime_error("Channel is closed!");
 		}
-
-		if (buffer_size_ == size_) {
-			full_mutex_.lock();
-			while (buffer_size_ == size_) {}
-			full_mutex_.unlock();
+		std::unique_lock<std::mutex> locker(defaultMutex);
+		fullQueue.wait(locker, [this]() {
+			return bufferSize < myQueue.size() || isClosed;
+		});
+		if (isClosed) {
+			throw std::runtime_error("Channel is closed!");
 		}
-
-		default_mutex_.lock();
-
-		queue_.push(value);
-		size_ = queue_.size();
-
-		default_mutex_.unlock();
+		myQueue.push(std::move(value));
+		emptyQueue.notify_one();
 	}
 
 	std::pair<T, bool> Recv() {
-		if (is_closed_ && size_ == 0) {
-			return { T(), false };
+		std::unique_lock<std::mutex> locker(defaultMutex);
+		if (isClosed) {
+			if (!myQueue.empty()) {
+				std::pair<T, bool> buff = { myQueue.front(), true };
+				myQueue.pop();
+
+				return buff;
+			}
+			else {
+				return std::make_pair(T(), false);
+			}
 		}
+		emptyQueue.wait(locker, [&]() {
+			return !myQueue.empty() || isClosed;
+		});
 
-		if (size_ == 0u) {
-			empty_mutex_.lock();
-			while (size_ == 0) {}
-			empty_mutex_.unlock();
+		if (!myQueue.empty()) {
+			std::pair<T, bool> buff = { myQueue.front(), true };
+			myQueue.pop();
+			fullQueue.notify_one();
+			return buff;
 		}
-
-		default_mutex_.lock();
-
-		std::pair<T, bool> buff;
-		buff = { queue_.front(), true };
-		queue_.pop();
-		size_ = queue_.size();
-
-		default_mutex_.unlock();
-		return buff;
+		else  return  std::make_pair(T(), false);
 	}
 
 	void Close() {
-		default_mutex_.lock();
-		is_closed_ = true;
-		default_mutex_.unlock();
+		defaultMutex.lock();
+		isClosed = true;
+		defaultMutex.unlock();
+		emptyQueue.notify_all();
+		fullQueue.notify_all();
 	}
 
 private:
-	std::atomic_uint32_t size_;
-	std::atomic_bool is_closed_;
-	uint32_t buffer_size_;
-	std::queue<T> queue_;
-	std::mutex empty_mutex_;
-	std::mutex full_mutex_;
-	std::mutex default_mutex_;
+	std::atomic<bool> isClosed;
+	std::atomic<int> bufferSize;
+	std::queue<T> myQueue;
+	std::mutex defaultMutex;
+	std::condition_variable fullQueue;
+	std::condition_variable emptyQueue;
+
 };
 
 #endif // BUFFERED_CHANNEL_H_
